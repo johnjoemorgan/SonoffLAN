@@ -23,7 +23,7 @@ class EWeLinkToggle(ToggleEntity):
         self._name = None
         self._is_on = False
 
-        self._update(device, False)
+        self._update(device)
 
         device.listen(self._update)
 
@@ -33,11 +33,10 @@ class EWeLinkToggle(ToggleEntity):
         # `entity_id` попадёт имя в латинице.
         self._name = self.device.name
 
-    def _update(self, device: EWeLinkDevice, schedule_update: bool = True):
+    def _update(self, device: EWeLinkDevice):
         """Обновление от устройства.
 
         :param device: Устройство в котором произошло обновление
-        :param schedule_update: Оповещать HA о обновление
         """
         for k in ATTRS:
             if k in device.state:
@@ -46,7 +45,7 @@ class EWeLinkToggle(ToggleEntity):
         is_on = device.is_on(self.channels)
         self._is_on = any(is_on) if self.channels else is_on
 
-        if schedule_update:
+        if self.hass:
             self.schedule_update_ha_state()
 
     @property
