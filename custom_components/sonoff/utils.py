@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import time
 import uuid
@@ -16,6 +17,8 @@ from Crypto.Hash import MD5
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad
 from Crypto.Util.Padding import unpad
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _params(**kwargs):
@@ -48,20 +51,31 @@ def save_cache(filename: str, data: dict):
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
 
 
-def load_devices(username, password):
+def load_devices(username: str, password: str):
     """Load device list from ewelink servers."""
+    if '@' not in username:
+        region = 'as'  # +91
+        params = _params(phoneNumber=username, password=password)
+    else:
+        region = 'eu'
+        params = _params(email=username, password=password)
 
-    params = _params(email=username, password=password)
     hex_dig = hmac.new(b'6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM',
                        json.dumps(params).encode(),
                        digestmod=hashlib.sha256).digest()
     headers = {'Authorization': "Sign " + base64.b64encode(hex_dig).decode()}
-    r = requests.post('https://eu-api.coolkit.cc:8080/api/user/login',
+    r = requests.post(f"https://{region}-api.coolkit.cc:8080/api/user/login",
                       headers=headers, json=params)
     resp = r.json()
 
-    region = resp['region']
-    if region != 'eu':
+    if 'region' not in resp:
+        info = 'phone' if '@' not in username else 'email'
+        _LOGGER.error(f"Login with {info} error: {resp}")
+        return None
+
+    if region != resp['region']:
+        region = resp['region']
+        _LOGGER.debug(f"Redirect to region: {region}")
         r = requests.post(
             f"https://{region}-api.coolkit.cc:8080/api/user/login",
             headers=headers, json=params)
